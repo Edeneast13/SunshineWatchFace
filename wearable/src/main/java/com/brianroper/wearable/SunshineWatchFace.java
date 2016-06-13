@@ -30,6 +30,7 @@ import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
 import android.text.format.Time;
@@ -138,6 +139,12 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
             mLowTempPaint = createTextPaint(R.color.card_grey_text_color);
 
             mTime = new Time();
+
+            IntentFilter filter = new IntentFilter(Intent.ACTION_SEND);
+            MessageReceiver receiver = new MessageReceiver();
+            LocalBroadcastManager.getInstance(SunshineWatchFace.this)
+                    .registerReceiver(receiver, filter);
+
         }
 
         @Override
@@ -294,6 +301,14 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                         - (timeMs % INTERACTIVE_UPDATE_RATE_MS);
                 mUpdateTimeHandler.sendEmptyMessageDelayed(MSG_UPDATE_TIME, delayMs);
             }
+        }
+    }
+
+    public class MessageReceiver extends BroadcastReceiver{
+        @Override
+        public void onReceive(Context context, Intent intent) {
+
+            String message = intent.getStringExtra("message");
         }
     }
 }

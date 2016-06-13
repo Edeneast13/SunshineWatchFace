@@ -38,6 +38,8 @@ import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.MessageApi;
 import com.google.android.gms.wearable.MessageEvent;
+import com.google.android.gms.wearable.Node;
+import com.google.android.gms.wearable.NodeApi;
 import com.google.android.gms.wearable.Wearable;
 
 import org.json.JSONArray;
@@ -62,6 +64,9 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
     private static final long DAY_IN_MILLIS = 1000 * 60 * 60 * 24;
     private static final int WEATHER_NOTIFICATION_ID = 3004;
     private GoogleApiClient mGoogleApiClient;
+    private String mHighTemp;
+    private String mLowTemp;
+    private int mId;
 
 
     private static final String[] NOTIFY_WEATHER_PROJECTION = new String[] {
@@ -79,6 +84,16 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
 
     public SunshineSyncAdapter(Context context, boolean autoInitialize) {
         super(context, autoInitialize);
+
+        if(mGoogleApiClient == null){
+
+            mGoogleApiClient = new GoogleApiClient.Builder(context)
+                    .addConnectionCallbacks(this)
+                    .addOnConnectionFailedListener(this)
+                    .addApi(Wearable.API)
+                    .build();
+        }
+        mGoogleApiClient.connect();
     }
 
     @Override
@@ -283,6 +298,14 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
                 JSONObject temperatureObject = dayForecast.getJSONObject(OWM_TEMPERATURE);
                 high = temperatureObject.getDouble(OWM_MAX);
                 low = temperatureObject.getDouble(OWM_MIN);
+
+                if(i == 0){
+
+                    mHighTemp = Utility.formatTemperature(getContext(), high);
+                    mLowTemp = Utility.formatTemperature(getContext(), low);
+                    mId = weatherId;
+                    new SendData("/message_path").start();
+                }
 
                 ContentValues weatherValues = new ContentValues();
 
@@ -576,4 +599,33 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
         Wearable.DataApi.removeListener(mGoogleApiClient, this);
         mGoogleApiClient.connect();
     }
+
+    private class SendData extends Thread{
+
+        String path;
+        String message = mHighTemp + " " + mLowTemp + " " + mId;
+
+        public SendData(String p){
+
+            path = p;
+        }
+
+        public void run(){
+
+            NodeApi.GetConnectedNodesResult nodes = Wearable.NodeApi
+                    .getConnectedNodes(mGoogleApiClient)
+                    .await();
+
+            for(Node node : nodes.getNodes()){
+
+                MessageApi.SendMessageResult result = Wearable.MessageApi
+                        .sendMessage(mGoogleApiClient, node.getId(),
+                                path, message.getBytes())
+                        .await();
+
+
+            }
+        }
+    }
+
 }
