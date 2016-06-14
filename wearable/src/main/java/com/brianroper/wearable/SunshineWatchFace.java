@@ -37,6 +37,16 @@ import android.text.format.Time;
 import android.view.SurfaceHolder;
 import android.view.WindowInsets;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.DataItemBuffer;
+import com.google.android.gms.wearable.DataMapItem;
+import com.google.android.gms.wearable.Wearable;
+
 import java.lang.ref.WeakReference;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
@@ -85,7 +95,9 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         }
     }
 
-    private class Engine extends CanvasWatchFaceService.Engine {
+    private class Engine extends CanvasWatchFaceService.Engine implements DataApi.DataListener,
+            GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener
+    {
         final Handler mUpdateTimeHandler = new EngineHandler(this);
         boolean mRegisteredTimeZoneReceiver = false;
         Paint mBackgroundPaint;
@@ -97,6 +109,8 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         String mHighTemp;
         String mLowTemp;
         Bitmap mConditionIcon;
+        int mWeatherId;
+        GoogleApiClient mGoogleApiClient;
 
         final BroadcastReceiver mTimeZoneReceiver = new BroadcastReceiver() {
             @Override
@@ -140,11 +154,17 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
 
             mTime = new Time();
 
-            IntentFilter filter = new IntentFilter(Intent.ACTION_SEND);
-            MessageReceiver receiver = new MessageReceiver();
-            LocalBroadcastManager.getInstance(SunshineWatchFace.this)
-                    .registerReceiver(receiver, filter);
+            if(mGoogleApiClient==null){
 
+                mGoogleApiClient = new GoogleApiClient.Builder(getApplicationContext())
+                        .addApi(Wearable.API)
+                        .addConnectionCallbacks(this)
+                        .addOnConnectionFailedListener(this)
+                        .build();
+            }
+            mGoogleApiClient.connect();
+
+            getDataFromApi();
         }
 
         @Override
@@ -302,13 +322,48 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                 mUpdateTimeHandler.sendEmptyMessageDelayed(MSG_UPDATE_TIME, delayMs);
             }
         }
-    }
 
-    public class MessageReceiver extends BroadcastReceiver{
         @Override
-        public void onReceive(Context context, Intent intent) {
+        public void onConnected(Bundle bundle) {
 
-            String message = intent.getStringExtra("message");
+        }
+
+        @Override
+        public void onConnectionSuspended(int i) {
+
+        }
+
+        @Override
+        public void onDataChanged(DataEventBuffer dataEventBuffer) {
+
+        }
+
+        @Override
+        public void onConnectionFailed(ConnectionResult connectionResult) {
+
+        }
+
+        public void getDataFromApi(){
+
+            PendingResult<DataItemBuffer> results = Wearable.DataApi.getDataItems(mGoogleApiClient);
+
+            results.setResultCallback(new ResultCallback<DataItemBuffer>() {
+                @Override
+                public void onResult(DataItemBuffer dataItems) {
+
+                    if(dataItems.getCount() != 0){
+
+                        DataMapItem dataMapItem = DataMapItem.fromDataItem(dataItems.get(0));
+
+                        mHighTemp = dataMapItem.getDataMap().getString("highTemp");
+                        mLowTemp = dataMapItem.getDataMap().getString("lowTemp");
+                        mWeatherId = dataMapItem.getDataMap().getInt("weatherId");
+                    }
+                    dataItems.release();
+                }
+            });
         }
     }
+
+
 }
