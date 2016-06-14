@@ -34,12 +34,10 @@ import com.example.android.sunshine.app.Utility;
 import com.example.android.sunshine.app.data.WeatherContract;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.DataApi;
-import com.google.android.gms.wearable.DataEventBuffer;
-import com.google.android.gms.wearable.MessageApi;
-import com.google.android.gms.wearable.MessageEvent;
-import com.google.android.gms.wearable.Node;
-import com.google.android.gms.wearable.NodeApi;
+import com.google.android.gms.wearable.PutDataMapRequest;
+import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 
 import org.json.JSONArray;
@@ -55,7 +53,7 @@ import java.net.URL;
 import java.util.Vector;
 
 public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements GoogleApiClient.ConnectionCallbacks,
-            GoogleApiClient.OnConnectionFailedListener, DataApi.DataListener, MessageApi.MessageListener{
+        GoogleApiClient.OnConnectionFailedListener{
     public final String LOG_TAG = SunshineSyncAdapter.class.getSimpleName();
     // Interval at which to sync with the weather, in seconds.
     // 60 seconds (1 minute) * 180 = 3 hours
@@ -88,9 +86,9 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
         if(mGoogleApiClient == null){
 
             mGoogleApiClient = new GoogleApiClient.Builder(context)
+                    .addApi(Wearable.API)
                     .addConnectionCallbacks(this)
                     .addOnConnectionFailedListener(this)
-                    .addApi(Wearable.API)
                     .build();
         }
         mGoogleApiClient.connect();
@@ -298,14 +296,6 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
                 JSONObject temperatureObject = dayForecast.getJSONObject(OWM_TEMPERATURE);
                 high = temperatureObject.getDouble(OWM_MAX);
                 low = temperatureObject.getDouble(OWM_MIN);
-
-                if(i == 0){
-
-                    mHighTemp = Utility.formatTemperature(getContext(), high);
-                    mLowTemp = Utility.formatTemperature(getContext(), low);
-                    mId = weatherId;
-                    new SendData("/message_path").start();
-                }
 
                 ContentValues weatherValues = new ContentValues();
 
@@ -569,12 +559,9 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
         getSyncAccount(context);
     }
 
-
     @Override
     public void onConnected(Bundle bundle) {
 
-        Wearable.DataApi.addListener(mGoogleApiClient, this);
-        Wearable.MessageApi.addListener(mGoogleApiClient, this);
     }
 
     @Override
@@ -583,49 +570,36 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
     }
 
     @Override
-    public void onDataChanged(DataEventBuffer dataEventBuffer) {
-
-    }
-
-    @Override
-    public void onMessageReceived(MessageEvent messageEvent) {
-
-    }
-
-    @Override
     public void onConnectionFailed(ConnectionResult connectionResult) {
 
-        Wearable.MessageApi.removeListener(mGoogleApiClient, this);
-        Wearable.DataApi.removeListener(mGoogleApiClient, this);
-        mGoogleApiClient.connect();
     }
 
-    private class SendData extends Thread{
+    //create and send data item to the wearable
+    public void sendWeatherData(String high, String low, int weatherId){
 
-        String path;
-        String message = mHighTemp + " " + mLowTemp + " " + mId;
+        PutDataMapRequest putDataMapRequest = PutDataMapRequest.create("/weather-data");
+        putDataMapRequest.getDataMap().putString("highTemp", high);
+        putDataMapRequest.getDataMap().putString("lowTemp", low);
+        putDataMapRequest.getDataMap().putInt("weatherId", weatherId);
 
-        public SendData(String p){
+        PutDataRequest request = putDataMapRequest.asPutDataRequest();
 
-            path = p;
-        }
+        Wearable.DataApi.putDataItem(mGoogleApiClient, request)
+                .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+                    @Override
+                    public void onResult(DataApi.DataItemResult dataItemResult) {
 
-        public void run(){
+                        if(!dataItemResult.getStatus().isSuccess()){
 
-            NodeApi.GetConnectedNodesResult nodes = Wearable.NodeApi
-                    .getConnectedNodes(mGoogleApiClient)
-                    .await();
+                            Log.i("Data Item: ", "Creation success");
+                        }
+                        else{
 
-            for(Node node : nodes.getNodes()){
-
-                MessageApi.SendMessageResult result = Wearable.MessageApi
-                        .sendMessage(mGoogleApiClient, node.getId(),
-                                path, message.getBytes())
-                        .await();
+                            Log.i("Data Item: ", "Creation failed");
+                        }
+                    }
+                });
 
 
-            }
-        }
     }
-
 }
