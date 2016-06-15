@@ -299,6 +299,10 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                     ? String.format("%d:%02d", mTime.hour, mTime.minute)
                     : String.format("%d:%02d:%02d", mTime.hour, mTime.minute, mTime.second);
             canvas.drawText(text, mXOffset, mYOffset, mTextPaint);
+
+            canvas.drawText(mHighTemp, 0, 1, mHighTempPaint);
+            canvas.drawText(mLowTemp, 1, 0, mLowTempPaint);
+
         }
 
 

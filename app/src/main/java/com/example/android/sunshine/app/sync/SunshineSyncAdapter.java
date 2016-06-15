@@ -297,6 +297,8 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
                 high = temperatureObject.getDouble(OWM_MAX);
                 low = temperatureObject.getDouble(OWM_MIN);
 
+                sendWeatherData(high, low, weatherId);
+
                 ContentValues weatherValues = new ContentValues();
 
                 weatherValues.put(WeatherContract.WeatherEntry.COLUMN_LOC_KEY, locationId);
@@ -575,11 +577,14 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
     }
 
     //create and send data item to the wearable
-    public void sendWeatherData(String high, String low, int weatherId){
+    public void sendWeatherData(Double high, Double low, int weatherId){
+
+        String highVal = String.valueOf(high);
+        String lowVal = String.valueOf(low);
 
         PutDataMapRequest putDataMapRequest = PutDataMapRequest.create("/weather-data");
-        putDataMapRequest.getDataMap().putString("highTemp", high);
-        putDataMapRequest.getDataMap().putString("lowTemp", low);
+        putDataMapRequest.getDataMap().putString("highTemp", highVal);
+        putDataMapRequest.getDataMap().putString("lowTemp", lowVal);
         putDataMapRequest.getDataMap().putInt("weatherId", weatherId);
 
         PutDataRequest request = putDataMapRequest.asPutDataRequest();
@@ -599,7 +604,5 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements 
                         }
                     }
                 });
-
-
     }
 }
